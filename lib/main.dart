@@ -1,115 +1,240 @@
+// ignore_for_file: library_private_types_in_public_api, use_key_in_widget_constructors, prefer_typing_uninitialized_variables, depend_on_referenced_packages
+
+import 'dart:async';
+import 'package:flutterdb/a.dart';
+import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
+
 import 'package:flutter/material.dart';
 
-void main() {
-  runApp(const MyApp());
+var db;
+
+class Student {
+  final int? id;
+  final String name;
+  final String address;
+  final String phone;
+
+  Student({
+    this.id,
+    required this.name,
+    required this.address,
+    required this.phone,
+  });
+  Map<String, dynamic> mapStudent() {
+    return {
+      'id': id,
+      'name': name,
+      'address': address,
+      'phone': phone,
+    };
+  }
+}
+
+Future<void> insertStudent(Student student) async {
+  final curDB = await db;
+
+  await curDB.insert(
+    'Student',
+    student.mapStudent(),
+    conflictAlgorithm: ConflictAlgorithm.replace,
+  );
+}
+
+Future<List<Student>> getStudents() async {
+  final curDB = await db;
+
+  final List<Map<String, dynamic>> studentMaps = await curDB.query('Student');
+
+  return List.generate(studentMaps.length, (i) {
+    return Student(
+      id: studentMaps[i]['id'],
+      name: studentMaps[i]['name'],
+      address: studentMaps[i]['address'],
+      phone: studentMaps[i]['phone'],
+    );
+  });
+}
+
+Future<void> updateStudent(Student student) async {
+  final curDB = await db;
+
+  await curDB.update(
+    'Student',
+    student.mapStudent(),
+    where: 'id = ?',
+    whereArgs: [student.id],
+  );
+}
+
+Future<void> deleteStudent(int email) async {
+  final curDB = await db;
+
+  await curDB.delete(
+    'Student',
+    where: 'id = ?',
+    whereArgs: [email],
+  );
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  db = openDatabase(
+    join(await getDatabasesPath(), 'studentDB.1'),
+    onCreate: (db, ver) {
+      return db.execute(
+        'CREATE TABLE Student(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,address TEXT,phone TEXT)',
+      );
+    },
+    version: 1,
+  );
+
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
-        primarySwatch: Colors.blue,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: StudentList(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
+class StudentList extends StatefulWidget {
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  _StudentListState createState() => _StudentListState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _StudentListState extends State<StudentList> {
+  List<Student> _students = [];
 
-  void _incrementCounter() {
+  @override
+  void initState() {
+    super.initState();
+
+    _loadStudents();
+  }
+
+  _loadStudents() async {
+    List<Student> students = await getStudents();
+
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      _students = students;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        automaticallyImplyLeading: false,
+        title: const Text('Danh sách sinh viên'),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
+      body: ListView.builder(
+        itemCount: _students.length,
+        itemBuilder: (context, index) {
+          return ListTile(
+            title: Text(_students[index].name),
+            subtitle: Text('Email: ${_students[index].address}'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            EditStudent(student: _students[index]),
+                      ),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete),
+                  onPressed: () {
+                    deleteStudent(_students[index].id ?? 0);
+
+                    _loadStudents();
+                  },
+                ),
+              ],
             ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => AddStudent(),
+            ),
+          );
+        },
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
+
+class AddStudent extends StatefulWidget {
+  @override
+  _AddStudentState createState() => _AddStudentState();
+}
+
+class _AddStudentState extends State<AddStudent> {
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _ageController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Thêm sinh viên'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: 'Tên'),
+            ),
+            TextField(
+              controller: _ageController,
+              decoration: const InputDecoration(labelText: 'Địa chỉ'),
+            ),
+            TextField(
+              controller: _phoneController,
+              decoration: const InputDecoration(labelText: 'Số điện thoại'),
+            ),
+            const SizedBox(height: 16.0),
+            ElevatedButton(
+              onPressed: () {
+                insertStudent(
+                  Student(
+                    name: _nameController.text,
+                    address: _ageController.text,
+                    phone: _phoneController.text,
+                  ),
+                );
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) {
+                      return StudentList();
+                    },
+                  ),
+                );
+              },
+              child: const Text('Thêm'),
             ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
