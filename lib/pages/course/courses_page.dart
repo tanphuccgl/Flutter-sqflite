@@ -1,20 +1,23 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first, library_private_types_in_public_api
 import 'package:flutter/material.dart';
-import 'package:flutterdb/edit.dart';
+import 'package:flutterdb/database/database_local.dart';
+import 'package:flutterdb/models/course_model.dart';
+import 'package:flutterdb/models/student_model.dart';
+import 'package:flutterdb/pages/course/create_course_page.dart';
+import 'package:flutterdb/pages/course/edit_course_page.dart';
 
-import 'package:flutterdb/main.dart';
+class CoursesPage extends StatefulWidget {
+  final StudentModel student;
 
-class CourseList extends StatefulWidget {
-  final Student student;
-
-  const CourseList({super.key, required this.student});
+  // Constructor cho trang danh sách khóa học, chấp nhận một đối tượng StudentModel.
+  const CoursesPage({super.key, required this.student});
 
   @override
-  _CourseListState createState() => _CourseListState();
+  _CoursesPageState createState() => _CoursesPageState();
 }
 
-class _CourseListState extends State<CourseList> {
-  List<Course> _courses = [];
+class _CoursesPageState extends State<CoursesPage> {
+  List<CourseModel> _courses = [];
   double averageScore = 0.0;
 
   @override
@@ -24,9 +27,12 @@ class _CourseListState extends State<CourseList> {
   }
 
   _loadCourses() async {
-    List<Course> courses = await getCoursesByStudent(widget.student.id ?? 0);
+    // Tải danh sách các khóa học của sinh viên từ cơ sở dữ liệu.
+    List<CourseModel> courses =
+        await DatabaseLocal.getCoursesByStudent(widget.student.id ?? 0);
     double totalScore = 0.0;
 
+    // Tính tổng số điểm của tất cả các khóa học.
     for (var course in courses) {
       totalScore += course.score;
     }
@@ -58,9 +64,10 @@ class _CourseListState extends State<CourseList> {
                     IconButton(
                       icon: const Icon(Icons.edit),
                       onPressed: () {
+                        // Chuyển đến trang chỉnh sửa khóa học.
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (context) => EditCourse(
+                            builder: (context) => EditCoursePage(
                               course: _courses[index],
                               student: widget.student,
                             ),
@@ -71,7 +78,8 @@ class _CourseListState extends State<CourseList> {
                     IconButton(
                       icon: const Icon(Icons.delete),
                       onPressed: () {
-                        deleteCourse(_courses[index].id ?? 0);
+                        // Xóa khóa học khỏi cơ sở dữ liệu và cập nhật danh sách.
+                        DatabaseLocal.deleteCourse(_courses[index].id ?? 0);
 
                         _loadCourses();
                       },
@@ -89,9 +97,10 @@ class _CourseListState extends State<CourseList> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
+          // Chuyển đến trang thêm mới khóa học.
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => AddCourse(
+              builder: (context) => CreateCoursePage(
                 student: widget.student,
               ),
             ),
@@ -103,6 +112,7 @@ class _CourseListState extends State<CourseList> {
   }
 
   String calculateGrade(double averageScore) {
+    // Tính toán và trả về xếp loại dựa trên điểm trung bình.
     if (averageScore >= 9.0) {
       return "Xuất sắc";
     } else if (averageScore >= 8.0) {
@@ -114,69 +124,5 @@ class _CourseListState extends State<CourseList> {
     } else {
       return "Yếu";
     }
-  }
-}
-
-class AddCourse extends StatefulWidget {
-  final Student student;
-  const AddCourse({
-    Key? key,
-    required this.student,
-  }) : super(key: key);
-  @override
-  _AddCourseState createState() => _AddCourseState();
-}
-
-class _AddCourseState extends State<AddCourse> {
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _ageController = TextEditingController();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Thêm môn học'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Tên'),
-            ),
-            TextField(
-              controller: _ageController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Điểm'),
-            ),
-            const SizedBox(height: 16.0),
-            ElevatedButton(
-              onPressed: () {
-                insertCourse(
-                  Course(
-                    name: _nameController.text,
-                    score: int.tryParse(_ageController.text) ?? 0,
-                    studentId: widget.student.id ?? 0,
-                  ),
-                );
-                Navigator.pop(context);
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (context) {
-                      return CourseList(
-                        student: widget.student,
-                      );
-                    },
-                  ),
-                );
-              },
-              child: const Text('Thêm'),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
