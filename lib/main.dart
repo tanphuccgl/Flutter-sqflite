@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'package:flutterdb/a.dart';
+import 'package:flutterdb/b.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -31,6 +32,38 @@ class Student {
   }
 }
 
+class Course {
+  int? id;
+  String name;
+  int score;
+  int studentId;
+
+  Course({
+    this.id,
+    required this.name,
+    required this.score,
+    required this.studentId,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'score': score,
+      'student_id': studentId,
+    };
+  }
+}
+
+Future<int> insertCourse(Course course) async {
+  final db1 = await db;
+  return await db1.insert(
+    'Course',
+    course.toMap(),
+    conflictAlgorithm: ConflictAlgorithm.replace,
+  );
+}
+
 Future<void> insertStudent(Student student) async {
   final curDB = await db;
 
@@ -39,6 +72,20 @@ Future<void> insertStudent(Student student) async {
     student.mapStudent(),
     conflictAlgorithm: ConflictAlgorithm.replace,
   );
+}
+
+Future<List<Course>> getCoursesByStudent(int studentId) async {
+  final db1 = await db;
+  final List<Map<String, dynamic>> maps = await db1
+      .query('Course', where: 'student_id = ?', whereArgs: [studentId]);
+  return List.generate(maps.length, (i) {
+    return Course(
+      id: maps[i]['id'],
+      name: maps[i]['name'],
+      score: maps[i]['score'],
+      studentId: maps[i]['student_id'],
+    );
+  });
 }
 
 Future<List<Student>> getStudents() async {
@@ -56,6 +103,12 @@ Future<List<Student>> getStudents() async {
   });
 }
 
+Future<int> updateCourse(Course course) async {
+  final db1 = await db;
+  return await db1.update('Course', course.toMap(),
+      where: 'id = ?', whereArgs: [course.id]);
+}
+
 Future<void> updateStudent(Student student) async {
   final curDB = await db;
 
@@ -65,6 +118,11 @@ Future<void> updateStudent(Student student) async {
     where: 'id = ?',
     whereArgs: [student.id],
   );
+}
+
+Future<int> deleteCourse(int id) async {
+  final db1 = await db;
+  return await db1.delete('Course', where: 'id = ?', whereArgs: [id]);
 }
 
 Future<void> deleteStudent(int email) async {
@@ -83,8 +141,11 @@ void main() async {
   db = openDatabase(
     join(await getDatabasesPath(), 'studentDB.1'),
     onCreate: (db, ver) {
-      return db.execute(
+      db.execute(
         'CREATE TABLE Student(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,address TEXT,phone TEXT)',
+      );
+      db.execute(
+        ' CREATE TABLE Course (id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,score INTEGER,student_id INTEGER,FOREIGN KEY (student_id) REFERENCES Student(id))',
       );
     },
     version: 1,
@@ -135,32 +196,41 @@ class _StudentListState extends State<StudentList> {
       body: ListView.builder(
         itemCount: _students.length,
         itemBuilder: (context, index) {
-          return ListTile(
-            title: Text(_students[index].name),
-            subtitle: Text('Email: ${_students[index].address}'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.edit),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            EditStudent(student: _students[index]),
-                      ),
-                    );
-                  },
+          return GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => CourseList(student: _students[index]),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete),
-                  onPressed: () {
-                    deleteStudent(_students[index].id ?? 0);
+              );
+            },
+            child: ListTile(
+              title: Text(_students[index].name),
+              subtitle: Text('Email: ${_students[index].address}'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              EditStudent(student: _students[index]),
+                        ),
+                      );
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete),
+                    onPressed: () {
+                      deleteStudent(_students[index].id ?? 0);
 
-                    _loadStudents();
-                  },
-                ),
-              ],
+                      _loadStudents();
+                    },
+                  ),
+                ],
+              ),
             ),
           );
         },
